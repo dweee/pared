@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Credential-free behavior checks for the Attic publishing helper."""
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -33,14 +35,19 @@ class AtticPublicationTests(unittest.TestCase):
                     'RUNNER_TEMP': str(self.root), 'GITHUB_STEP_SUMMARY': str(self.root / 'summary')}
         self.checked_dirs = []
 
-    def inspect_invocation(self, args, *, input, text, env, check):
+    def inspect_invocation(self, args, *, input, text, env, check, stdout, stderr, timeout):
         expected = [str(self.binary), 'push', '--jobs', '1']
         if not self.checked_dirs:
             expected += ['--no-closure', '--ignore-upstream-cache-filter']
         expected += ['--stdin', 'ci:flakey']
         self.assertEqual(args, expected)
         self.assertEqual(input.splitlines(), self.paths)
-        self.assertTrue(text and check)
+        self.assertTrue(text)
+        self.assertFalse(check)
+        self.assertEqual(stdout, subprocess.PIPE)
+        self.assertEqual(stderr, subprocess.STDOUT)
+        self.assertGreater(timeout, 0)
+        self.assertLessEqual(timeout, module.PUBLICATION_SECONDS)
         self.assertNotIn('ATTIC_TOKEN', env)
         self.assertNotIn(self.secret, json.dumps(args) + input + json.dumps(env))
         temporary = Path(env['XDG_CONFIG_HOME'])
@@ -51,6 +58,7 @@ class AtticPublicationTests(unittest.TestCase):
         self.assertEqual(data['servers']['ci']['token'], self.secret)
         self.assertEqual(data['servers']['ci']['endpoint'], self.env['ATTIC_ENDPOINT'] + '/')
         self.checked_dirs.append(temporary)
+        return subprocess.CompletedProcess(args, 0, stdout='')
 
     def test_exact_outputs_closures_permissions_and_cleanup(self):
         with patch.dict(os.environ, self.env, clear=True), patch.object(module.subprocess, 'run', side_effect=self.inspect_invocation):
@@ -75,15 +83,80 @@ class AtticPublicationTests(unittest.TestCase):
 
     def test_failed_dependency_upload_keeps_publication_red_and_cleans_credentials(self):
         def upload(*args, **kwargs):
-            self.inspect_invocation(*args, **kwargs)
+            result = self.inspect_invocation(*args, **kwargs)
             if len(self.checked_dirs) == 2:
                 raise subprocess.CalledProcessError(19, args[0])
+            return result
         with patch.dict(os.environ, self.env, clear=True), patch.object(module.subprocess, 'run', side_effect=upload) as call:
             with self.assertRaises(subprocess.CalledProcessError):
                 module.publish(self.outputs)
             self.assertEqual(call.call_count, 2)
         self.assertTrue(all(not p.exists() for p in self.checked_dirs))
         self.assertFalse((self.root / 'summary').exists())
+
+    def test_transient_root_failure_retries_identical_roots_then_publishes_closure(self):
+        calls = []
+        def upload(args, **kwargs):
+            self.assertNotIn('ATTIC_TOKEN', kwargs['env'])
+            calls.append(args)
+            return subprocess.CompletedProcess(args, int(len(calls) == 1),
+                stdout='InternalServerError\n' if len(calls) == 1 else '')
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(module.subprocess, 'run', side_effect=upload), \
+                patch.object(module.time, 'sleep') as sleep:
+            module.publish(self.outputs)
+        self.assertEqual(calls[0], calls[1])
+        self.assertIn('--no-closure', calls[1])
+        self.assertNotIn('--no-closure', calls[2])
+        sleep.assert_called_once_with(15)
+        self.assertIn('Uploaded 2 output(s)', (self.root / 'summary').read_text())
+
+    def test_permanent_error_does_not_retry_or_publish_closure(self):
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(module.subprocess, 'run', return_value=
+                    subprocess.CompletedProcess([], 1, stdout='HTTP 403 Forbidden\n')) as call, \
+                patch.object(module.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.publish(self.outputs)
+        call.assert_called_once()
+        sleep.assert_not_called()
+        self.assertFalse((self.root / 'summary').exists())
+
+    def test_transient_errors_are_bounded_and_remove_credentials(self):
+        directories = []
+        def upload(args, **kwargs):
+            directories.append(Path(kwargs['env']['XDG_CONFIG_HOME']))
+            return subprocess.CompletedProcess(args, 1, stdout='InternalServerError\n')
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(module.subprocess, 'run', side_effect=upload) as call, \
+                patch.object(module.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.publish(self.outputs)
+        self.assertEqual(call.call_count, 5)
+        self.assertEqual(sleep.call_count, 4)
+        self.assertTrue(all(not p.exists() for p in directories))
+        self.assertFalse((self.root / 'summary').exists())
+
+    def test_one_deadline_covers_uploads_and_backoff(self):
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(module.time, 'monotonic', side_effect=[0, 0, module.PUBLICATION_SECONDS - 1]), \
+                patch.object(module.subprocess, 'run', return_value=
+                    subprocess.CompletedProcess([], 1, stdout='InternalServerError\n')), \
+                patch.object(module.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                module.publish(self.outputs)
+        sleep.assert_not_called()
+        self.assertFalse((self.root / 'summary').exists())
+
+    def test_client_diagnostic_redacts_the_publication_secret(self):
+        with patch.dict(os.environ, self.env, clear=True), \
+                patch.object(module.subprocess, 'run', return_value=
+                    subprocess.CompletedProcess([], 1, stdout=self.secret)), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.publish(self.outputs)
+        self.assertNotIn(self.secret, output.getvalue())
+        self.assertIn('[redacted]', output.getvalue())
 
     def test_bad_configuration_never_contacts_server(self):
         cases = [('ATTIC_ENDPOINT', 'http://cache.example.test'),

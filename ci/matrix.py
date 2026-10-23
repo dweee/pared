@@ -10,7 +10,7 @@ parser.add_argument("family", choices=["darwin", "others"])
 parser.add_argument("--package", default="all")
 args = parser.parse_args()
 inventory = json.loads((Path(__file__).resolve().parents[1] / "nix/platforms.json").read_text())
-runners = {"aarch64-darwin": "macos-15", "aarch64-linux": "ubuntu-24.04-arm", "x86_64-linux": "ubuntu-24.04"}
+runners = {"aarch64-darwin": "xcode-27", "aarch64-linux": "ubuntu-24.04-arm", "x86_64-linux": "ubuntu-24.04"}
 if args.package != "all" and not any(args.package in names for names in inventory.values()):
     raise ValueError("Unknown package")
 jobs = [{"system": system, "runner": runners[system], "package": package}
