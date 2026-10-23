@@ -21,3 +21,7 @@ npm-debug.log*
 
 # macOS metadata
 .DS_Store
+
+# Python cache files are local build artifacts.
+__pycache__/
+*.pyc
