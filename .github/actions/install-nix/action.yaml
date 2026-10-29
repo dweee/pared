@@ -10,7 +10,13 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+    - uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3 # v3
       with:
-        extra-conf: ${{ inputs.extra-conf }}
+        source-tag: v3.24.1
+        summarize: false
+        kvm: false
+        extra-conf: |
+          extra-experimental-features = parallel-eval
+          eval-cores = 2
+          ${{ inputs.extra-conf }}
         github-token: ${{ github.token }}
