@@ -138,7 +138,8 @@ class PrivateReadTests(unittest.TestCase):
 
     def test_native_workflows_keep_prs_credential_free_and_cleanup_before_export(self):
         import yaml
-        workflows = sorted(Path(__file__).resolve().parents[1].joinpath('.github/workflows').glob('*-actions.yml'))
+        directory = Path(__file__).resolve().parents[1] / '.github/workflows'
+        workflows = sorted(directory.glob('*-actions.yml')) + [directory / 'github-pages.yaml']
         self.assertTrue(workflows)
         for workflow in workflows:
             jobs = yaml.safe_load(workflow.read_text())['jobs']
@@ -155,7 +156,9 @@ class PrivateReadTests(unittest.TestCase):
             export = next(i for i, step in enumerate(steps) if 'ci/transfer-attic.py export' in step.get('run', ''))
             self.assertLess(cleanup, export)
             self.assertEqual(steps[cleanup]['if'], '${{ always() }}')
-            publisher = jobs['publish']
+            publisher = jobs['publish-cache' if workflow.name == 'github-pages.yaml' else 'publish']
+            self.assertIn('github.event.repository.default_branch', publisher['if'])
+            self.assertIn("github.event_name == 'push'", publisher['if'])
             runs = [step.get('run', '') for step in publisher['steps']]
             self.assertLess(runs.index('python3 ci/configure-niks3.py --oidc'), runs.index('bash ci/install-niks3.sh --retain-bootstrap'))
             self.assertLess(runs.index('python3 ci/push-niks3.py --outputs niks3-bootstrap-outputs.txt'), runs.index('python3 ci/transfer-attic.py import --directory attic-transfer'))

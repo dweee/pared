@@ -1,29 +1,26 @@
 name: GitHub Pages Docs Generation
-
-on:
+'on':
   push:
     branches:
-      - master
+    - native-cache
     paths:
-      - "flake.nix"
-      - "flake.lock"
-      - "Sources/Pared/Resources/catalog.json"
-      - "nix/**"
-      - "docs/**"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "vite.config.ts"
-      - ".github/actions/install-nix/**"
-      - ".github/workflows/github-pages.yaml"
-  workflow_dispatch:
-
+    - flake.nix
+    - flake.lock
+    - Sources/Pared/Resources/catalog.json
+    - nix/**
+    - docs/**
+    - package.json
+    - package-lock.json
+    - tsconfig.json
+    - vite.config.ts
+    - .github/actions/install-nix/**
+    - .github/workflows/github-pages.yaml
+    - ci/**
+  workflow_dispatch: null
 concurrency:
   group: github-pages
   cancel-in-progress: false
-
 permissions: {}
-
 jobs:
   build:
     name: Build documentation
@@ -31,28 +28,54 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-          persist-credentials: false
-
-      - uses: ./.github/actions/install-nix
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-
-      - name: Build documentation
-        run: |
-          nix build .#docs
-          cp -r result/share/doc/pared public
-          unlink result
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: ./public
-
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        fetch-depth: 1
+        persist-credentials: false
+    - uses: ./.github/actions/install-nix
+      with:
+        extra-conf: |
+          accept-flake-config = false
+          substituters = https://cache.nixos.org/
+          extra-substituters =
+    - name: Configure read-only Niks3 access with GitHub OIDC
+      if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      run: python3 ci/configure-niks3.py --oidc
+    - name: Configure GitHub Pages
+      uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d
+    - name: Build documentation
+      run: |
+        set -euo pipefail
+        python3 ci/public-closure.py .#docs
+        python3 ci/retain-build-outputs.py --target .#docs --manifest cache-outputs.txt -- nix build .#docs --no-update-lock-file --no-write-lock-file -L
+        cp -r result/share/doc/pared public
+        unlink result
+    - name: Remove private read credentials before exporting build data
+      if: ${{ always() }}
+      run: python3 ci/configure-niks3.py --cleanup
+    - name: Save selected runtime closures independently of cache publication
+      timeout-minutes: 15
+      env:
+        ATTIC_MAX_CLOSURE_MIB: ${{ vars.ATTIC_MAX_CLOSURE_MIB || '4096' }}
+      run: python3 ci/transfer-attic.py export --directory attic-transfer --manifest cache-outputs.txt
+      id: cache_transfer
+      if: ${{ always() && !cancelled() && hashFiles('cache-outputs.txt') != '' }}
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: nix-docs-${{ github.sha }}
+        path: attic-transfer/
+        retention-days: 1
+        compression-level: 0
+        if-no-files-found: error
+        overwrite: false
+      if: ${{ always() && !cancelled() && steps.cache_transfer.outcome == 'success' }}
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+      with:
+        path: ./public
+    if: ${{ vars.DAVE_FORK_CI_ENABLED == 'true' }}
   deploy:
     name: Publish documentation
     if: github.ref_name == github.event.repository.default_branch
@@ -60,12 +83,61 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      pages: write # Deploy the built site to GitHub Pages
-      id-token: write # Authenticate the Pages deployment
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346
+  publish-cache:
+    permissions:
+      contents: read
+      id-token: write
+    needs:
+    - build
+    if: ${{ always() && !cancelled() && (needs.build.result == 'success' || needs.build.result == 'failure') && vars.DAVE_FORK_CI_ENABLED == 'true' && (vars.NIKS3_PUSH_ENABLED || vars.ATTIC_PUSH_ENABLED) == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    name: Publish documentation build outputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - uses: DeterminateSystems/determinate-nix-action@92957199488000b908fdad19f63711000965d8f3
+      with:
+        source-tag: v3.24.1
+        summarize: false
+        kvm: false
+        extra-conf: |
+          experimental-features = nix-command flakes parallel-eval
+          eval-cores = 2
+          accept-flake-config = false
+          substituters = https://cache.nixos.org/
+          extra-substituters =
+    - name: Verify Determinate client and daemon
+      run: |
+        nix --version | grep -F 'Determinate Nix 3.24.1'
+        nix store info --store daemon --json
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: nix-docs-${{ github.sha }}
+        path: attic-transfer
+    - name: Read Niks3 before installing the pinned publisher
+      run: python3 ci/configure-niks3.py --oidc
+    - name: Install pinned Niks3 publisher
+      run: bash ci/install-niks3.sh --retain-bootstrap
+    - name: Publish bootstrap client and completed build dependencies
+      run: python3 ci/push-niks3.py --outputs niks3-bootstrap-outputs.txt
+    - name: Import data without running any package programs
+      timeout-minutes: 15
+      env:
+        ATTIC_MAX_CLOSURE_MIB: ${{ vars.ATTIC_MAX_CLOSURE_MIB || '4096' }}
+      run: python3 ci/transfer-attic.py import --directory attic-transfer
+    - name: Publish to Niks3 with GitHub OIDC and verify S3 integrity
+      run: python3 ci/push-niks3.py --outputs attic-transfer/outputs.txt
+    - name: Remove job-local Niks3 reader
+      if: ${{ always() }}
+      run: python3 ci/configure-niks3.py --cleanup

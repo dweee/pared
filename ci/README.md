@@ -16,3 +16,10 @@ workflow is installed by this change.
 The native job keeps the arm64 xcode-27 runner because Package.swift requires
 macOS 27, and keeps all upstream CLI checks. See the maintained GitHub runner
 reference in .github/workflows/darwin-actions.yml.
+
+The documentation workflow also reads Niks3 on the trusted default branch,
+retains the selected docs build graph on failure, and sends bounded store data
+to an isolated Linux publisher. It follows this fork's native-cache branch and
+manual dispatches. Pages deployment still requires the default branch; cache
+publication has its own trust and enable guards. The tag release uses Swift
+directly rather than Nix, so it produces no Nix store outputs to publish.
