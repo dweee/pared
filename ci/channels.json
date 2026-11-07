@@ -1,0 +1,18 @@
+{
+  "targets": {
+    "aarch64-darwin": [
+      {
+        "attribute": "packages.aarch64-darwin.pared",
+        "visibility": "public"
+      }
+    ]
+  },
+  "excludedSystems": [],
+  "submodules": false,
+  "integrationInventory": false,
+  "version": 1,
+  "forge": "github",
+  "repository": "dweee/pared",
+  "branch": "native-cache",
+  "remote": "https://github.com/dweee/pared.git"
+}
