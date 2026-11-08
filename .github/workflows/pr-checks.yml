@@ -1,16 +1,21 @@
 name: PR cache publisher checks
-on:
-  pull_request:
+'on':
+  pull_request: null
 permissions:
   contents: read
 jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          persist-credentials: false
-      - name: Credential-free publisher regression tests
-        run: |
-          python3 ci/test-push-attic.py
-          python3 ci/test-push-niks3.py
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - name: Install pinned workflow test parser
+      run: |
+        python3 -m venv "$RUNNER_TEMP/cache-tests"
+        "$RUNNER_TEMP/cache-tests/bin/python" -m pip install --disable-pip-version-check PyYAML==6.0.3
+        echo "$RUNNER_TEMP/cache-tests/bin" >> "$GITHUB_PATH"
+    - name: Credential-free publisher regression tests
+      run: |
+        for test in ci/test-*.py; do python3 "$test"; done
+        python3 ci/release-channel.py policy

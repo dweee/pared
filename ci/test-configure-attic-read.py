@@ -137,21 +137,32 @@ class PrivateReadTests(unittest.TestCase):
         self.assertNotIn("Traceback", result.stderr)
 
     def test_native_workflows_keep_prs_credential_free_and_cleanup_before_export(self):
-        workflows = sorted(Path(__file__).resolve().parents[1].joinpath(".github/workflows").glob("*-actions.yml"))
+        import yaml
+        directory = Path(__file__).resolve().parents[1] / '.github/workflows'
+        workflows = sorted(directory.glob('*-actions.yml')) + [directory / 'github-pages.yaml']
         self.assertTrue(workflows)
         for workflow in workflows:
-            text = workflow.read_text()
-            build = text.split("\n  publish:\n")[0]
-            self.assertNotIn("ATTIC_PULL_TOKEN", build)
-            read = build.split("      - name: Configure authenticated private cache reads", 1)[1].split("      - name:", 1)[0]
-            self.assertIn("github.event_name == 'push'", read)
-            self.assertIn("github.event_name == 'workflow_dispatch'", read)
-            self.assertIn("github.event.repository.default_branch", read)
-            self.assertNotIn("pull_request", read)
-            cleanup = build.index("--cleanup")
-            self.assertLess(cleanup, build.index("ci/transfer-attic.py export"))
-            self.assertIn("if: ${{ always() }}", build[build.rindex("      - name:", 0, cleanup):cleanup])
-            self.assertIn('nix build "$target"', build)
+            jobs = yaml.safe_load(workflow.read_text())['jobs']
+            native = next(job for job in jobs.values() if any('retain-build-outputs.py' in step.get('run', '') for step in job.get('steps', [])))
+            steps = native['steps']
+            reader = next(step for step in steps if step.get('run') == 'python3 ci/configure-niks3.py --oidc')
+            self.assertIn("github.event_name == 'push'", reader['if'])
+            self.assertIn("github.event_name == 'workflow_dispatch'", reader['if'])
+            self.assertIn('github.event.repository.default_branch', reader['if'])
+            self.assertNotIn('pull_request', reader['if'])
+            self.assertNotIn('env', reader)
+            self.assertNotIn('ATTIC_TOKEN', json.dumps(native))
+            cleanup = next(i for i, step in enumerate(steps) if step.get('run') == 'python3 ci/configure-niks3.py --cleanup')
+            export = next(i for i, step in enumerate(steps) if 'ci/transfer-attic.py export' in step.get('run', ''))
+            self.assertLess(cleanup, export)
+            self.assertEqual(steps[cleanup]['if'], '${{ always() }}')
+            publisher = jobs['publish-cache' if workflow.name == 'github-pages.yaml' else 'publish']
+            self.assertIn('github.event.repository.default_branch', publisher['if'])
+            self.assertIn("github.event_name == 'push'", publisher['if'])
+            runs = [step.get('run', '') for step in publisher['steps']]
+            self.assertLess(runs.index('python3 ci/configure-niks3.py --oidc'), runs.index('bash ci/install-niks3.sh --retain-bootstrap'))
+            self.assertLess(runs.index('python3 ci/push-niks3.py --outputs niks3-bootstrap-outputs.txt'), runs.index('python3 ci/transfer-attic.py import --directory attic-transfer'))
+            self.assertNotIn('secrets.ATTIC_', json.dumps(jobs))
 
     def test_netrc_is_private_and_token_does_not_enter_nix_config(self):
         with tempfile.TemporaryDirectory() as tmp:

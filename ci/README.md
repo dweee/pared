@@ -1,6 +1,25 @@
 Native package builds use the explicit platform inventory and pinned flake inputs.
-Successful default-branch builds export approved runtime closures to a separate publisher job.
-Pull requests never publish. Configure ATTIC_TOKEN and enable DAVE_FORK_CI_ENABLED and
-ATTIC_PUSH_ENABLED using repository settings; never commit credentials.
+Trusted default-branch jobs read Niks3 through refreshing read-only GitHub OIDC.
+Completed selected build dependencies are retained even if a later build fails,
+then exported as bounded public data to a separate Niks3 publisher job. The
+trusted publisher client is installed before imported data; its own completed
+build dependencies are published separately. PR events receive no private reader
+and never publish. Keep DAVE_FORK_CI_ENABLED and NIKS3_PUSH_ENABLED enabled for
+this fork; the existing ATTIC_PUSH_ENABLED setting remains a compatibility gate.
+No active reader or publisher uses Attic credentials.
 
-The native job uses the arm64 `xcode-27` image because Package.swift declares macOS 27. It runs the upstream CLI checks instead of disabling them on an older runtime. GitHub documents the image at https://github.blog/changelog/2026-09-10-xcode-27-runner-image-now-runs-on-macos-27/.
+ci/channels.json records ownership and the existing explicit native application
+inventory for shared helper metadata and policy validation. This fork retains
+its custom native workflow; no tested/stable promotion or scheduled-update
+workflow is installed by this change.
+
+The native job keeps the arm64 xcode-27 runner because Package.swift requires
+macOS 27, and keeps all upstream CLI checks. See the maintained GitHub runner
+reference in .github/workflows/darwin-actions.yml.
+
+The documentation workflow also reads Niks3 on the trusted default branch,
+retains the selected docs build graph on failure, and sends bounded store data
+to an isolated Linux publisher. It follows this fork's native-cache branch and
+manual dispatches. Pages deployment still requires the default branch; cache
+publication has its own trust and enable guards. The tag release uses Swift
+directly rather than Nix, so it produces no Nix store outputs to publish.
