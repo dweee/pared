@@ -23,3 +23,13 @@ to an isolated Linux publisher. It follows this fork's native-cache branch and
 manual dispatches. Pages deployment still requires the default branch; cache
 publication has its own trust and enable guards. The tag release uses Swift
 directly rather than Nix, so it produces no Nix store outputs to publish.
+
+The native platform inventory covers every exported package on all three declared
+platforms, with Darwin's `default` recorded as an alias of `pared`. The matrix
+compares that inventory with the actual locked flake exports and also schedules
+all declared native checks. A new package or unsupported system fails planning
+instead of disappearing from coverage. Each selected derivation builds `^*`;
+package and check artifacts have separate names. Linux exports use native x86
+and ARM workers, while Swift CLI work retains the required xcode-27 Mac worker.
+These are cache builds and checks; they do not activate Apple settings or deploy
+Pages, and this fork still installs no tested/stable promotion workflow.

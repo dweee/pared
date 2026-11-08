@@ -1,5 +1,21 @@
 {
   "aarch64-darwin": [
+    "docs",
+    "docs-json",
+    "profile",
+    "declarations",
     "pared"
+  ],
+  "aarch64-linux": [
+    "docs",
+    "docs-json",
+    "profile",
+    "declarations"
+  ],
+  "x86_64-linux": [
+    "docs",
+    "docs-json",
+    "profile",
+    "declarations"
   ]
 }
