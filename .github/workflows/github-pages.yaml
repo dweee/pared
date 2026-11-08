@@ -50,7 +50,7 @@ jobs:
       run: |
         set -euo pipefail
         python3 ci/public-closure.py .#docs
-        python3 ci/retain-build-outputs.py --target .#docs --manifest cache-outputs.txt -- nix build .#docs --no-update-lock-file --no-write-lock-file -L
+        python3 ci/retain-build-outputs.py --target .#docs --manifest cache-outputs.txt -- nix build .#docs --print-out-paths --no-update-lock-file --no-write-lock-file -L
         cp -r result/share/doc/pared public
         unlink result
     - name: Remove private read credentials before exporting build data
