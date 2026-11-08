@@ -2,7 +2,59 @@
   "targets": {
     "aarch64-darwin": [
       {
+        "attribute": "packages.aarch64-darwin.docs",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-darwin.docs-json",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-darwin.profile",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-darwin.declarations",
+        "visibility": "public"
+      },
+      {
         "attribute": "packages.aarch64-darwin.pared",
+        "visibility": "public"
+      }
+    ],
+    "aarch64-linux": [
+      {
+        "attribute": "packages.aarch64-linux.docs",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-linux.docs-json",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-linux.profile",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.aarch64-linux.declarations",
+        "visibility": "public"
+      }
+    ],
+    "x86_64-linux": [
+      {
+        "attribute": "packages.x86_64-linux.docs",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.x86_64-linux.docs-json",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.x86_64-linux.profile",
+        "visibility": "public"
+      },
+      {
+        "attribute": "packages.x86_64-linux.declarations",
         "visibility": "public"
       }
     ]
