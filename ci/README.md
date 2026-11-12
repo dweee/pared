@@ -10,8 +10,8 @@ No active reader or publisher uses Attic credentials.
 
 ci/channels.json records ownership and the existing explicit native application
 inventory for shared helper metadata and policy validation. This fork retains
-its custom native workflow; no tested/stable promotion or scheduled-update
-workflow is installed by this change.
+its custom native workflow; tested/stable promotion and scheduled-update workflows are installed by the
+reviewed adoption change described below.
 
 The native job keeps the arm64 xcode-27 runner because Package.swift requires
 macOS 27, and keeps all upstream CLI checks. See the maintained GitHub runner
@@ -32,4 +32,27 @@ instead of disappearing from coverage. Each selected derivation builds `^*`;
 package and check artifacts have separate names. Linux exports use native x86
 and ARM workers, while Swift CLI work retains the required xcode-27 Mac worker.
 These are cache builds and checks; they do not activate Apple settings or deploy
-Pages, and this fork still installs no tested/stable promotion workflow.
+Pages, and tested/stable promotion follows the separate guarded workflow.
+
+
+Guarded upstream maintenance and channels
+----------------------------------------
+
+The owner installs the maintained guarded upstream-sync caller, scheduled
+input/monitor updates and tested/stable channel workflow for `native-cache`.
+`.fork-ci.json` tracks `4evy/pared:master`, preserves fork controls and Nix files,
+and covers all thirteen declared packages plus cleanup checks on all systems.
+Upstream merges stay review-gated (`auto-merge: false`); input PRs reuse the
+maintained routine branch. Swift package builds retain native CLI tests.
+
+Both sync and channel Darwin builds require `xcode-27` (macOS 27). After
+regenerating channel automation, retain that explicit owner runner override;
+`ci/test-pared-live-policy.py` rejects a downgrade to the default Mac runner.
+The sync caller pins controller `b8caba7f1506fdf2d770e36fb95852ac7446bcd2`
+in both revision fields. Controller PR57 permits `xcode-27` only for
+`aarch64-darwin`; other native runner defaults remain unchanged. Installed
+channel helpers retain their reviewed controller55 bytes and hash manifest.
+Owner review, native checks and explicit enablement of
+`GUARDED_UPSTREAM_SYNC_ENABLED` remain required before a live sync.
+Prepared adoption does not establish a successful live run.
+No job activates Apple settings, deletes model data or deploys Pages.
