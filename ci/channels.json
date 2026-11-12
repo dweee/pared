@@ -66,5 +66,9 @@
   "forge": "github",
   "repository": "dweee/pared",
   "branch": "native-cache",
-  "remote": "https://github.com/dweee/pared.git"
+  "remote": "https://github.com/dweee/pared.git",
+  "inputCheckWorkflows": [
+    "darwin-actions.yml",
+    "others-actions.yml"
+  ]
 }
