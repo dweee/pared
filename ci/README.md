@@ -56,3 +56,8 @@ Owner review, native checks and explicit enablement of
 `GUARDED_UPSTREAM_SYNC_ENABLED` remain required before a live sync.
 Prepared adoption does not establish a successful live run.
 No job activates Apple settings, deletes model data or deploys Pages.
+
+The cleanup check runs the complete portable activation-shell regression suite on
+all three platforms. Darwin and x86 Linux also retain the original Swift suite.
+The frozen nixpkgs Swift compiler is marked broken on ARM Linux because its gold
+linker fails; ARM cleanup does not require Swift or allow a broken package.

@@ -13,13 +13,15 @@
     "nix/declarations.nix",
     "nix/tests/cleanup.nix",
     "ci/matrix.py",
-    "nix/platforms.json"
+    "nix/platforms.json",
+    "Tests/activation/activation.py"
   ],
   "protected_paths": [
     "ci/**",
     "nix/**",
     "flake.nix",
-    "flake.lock"
+    "flake.lock",
+    "Tests/activation/activation.py"
   ],
   "matrix": [
     {
