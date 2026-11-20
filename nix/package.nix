@@ -37,6 +37,7 @@ stdenv.mkDerivation (finalAttrs: {
   doCheck = true;
   checkPhase = ''
     runHook preCheck
+    swiftc -typecheck Sources/Pared/gui/state.swift Tests/gui-state/gui-state.swift
     swift Tests/cli/cli.swift .build/release/pared
     runHook postCheck
   '';
