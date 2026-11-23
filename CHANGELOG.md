@@ -2,8 +2,24 @@
 
 ## Unreleased
 
+### Added
+
+- Choose between Siri AI (Beta) and Siri Classic on macOS 27 without changing
+  the Siri or Apple Intelligence settings
+
+### Changed
+
+- Building the CLI and app from source now requires Swift 6.4, matching the Nix
+  toolchain
+
 ### Fixed
 
+- Core AI Models and Image Playground download requests validate again on macOS
+  27.2.1. Pared ignores empty alias entries and uses Apple's Diffusion mapping
+  for Image Playground
+- Generated profiles no longer redirect model downloads that macOS updates can
+  also use. Replace older installed Pared profiles before updating macOS
+  ([#8](https://redirect.github.com/4evy/pared/issues/8))
 - The Nix package builds with Swift 6.2.4 again; the GUI command runner no
   longer hits the type checker's time limit when assembling CLI arguments
 - The Nix package builds with Swift 6.4 and the macOS 27 SDK without Apple's

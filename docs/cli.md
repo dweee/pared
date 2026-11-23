@@ -91,10 +91,14 @@ pared enable writingTools
 pared profile open
 ```
 
-Install the profile in System Settings to apply supported controls and block
-unwanted model downloads. Replace it after every change; its settings stay in
-effect until replaced or removed. Some controls require device management; see
+Install the profile in System Settings to apply supported feature controls.
+Replace it after every change. Its settings stay in effect until replaced or
+removed. Some controls require device management. See
 [profile compatibility](how-it-works.md#profile-compatibility).
+
+[Replace older profiles before updating macOS][profile-upgrade].
+
+[profile-upgrade]: how-it-works.md#replace-older-profiles-before-updating-macos
 
 `enable`, `disable`, and `reset` save choices and apply supported local
 preferences. They do not download or remove models.
@@ -253,8 +257,8 @@ For models confirmed to be in use, close affected apps, log out or restart, then
 check `pared models status` before retrying. Check status after timeouts too:
 removal may already have happened.
 
-Keep the profile installed to block new downloads. Pared checks folders, not
-recovered APFS space; System Settings may update its storage total later.
+macOS can download removed models again. Pared checks folders, not recovered
+APFS space. System Settings may update its storage total later.
 
 ## Keep Siri
 
@@ -266,13 +270,24 @@ pared enable siri siriVoiceTrigger
 pared profile open
 ```
 
-Install the updated profile, then check Siri in System Settings -\> Apple
-Intelligence & Siri. `siriVoiceTrigger` controls voice activation separately;
-omit it if you only want keyboard activation.
+Install the updated profile, then check Siri in System Settings → Siri.
+`siriVoiceTrigger` controls voice activation separately. Omit it if you only
+want keyboard activation.
 
 Keeping Siri enabled or unmanaged keeps its shared foundation models; basic Siri
 is not guaranteed to work if you delete them. Siri-related services also serve
 other macOS features, so a running process alone does not show that Siri is on.
+
+### Choose your Siri version
+
+On macOS 27 or later, `pared disable siriAI` selects Siri Classic for your
+account. `pared enable siriAI` allows Siri AI where available but does not
+complete Apple's beta setup. `pared reset siriAI` removes the local override.
+These commands do not turn Siri or Apple Intelligence on or off.
+
+Leave Apple Intelligence on and retain **Core AI Models** if you use features
+such as Writing Tools summaries. Siri AI's own screen-reading and summary
+commands aren't available in Siri Classic.
 
 ## Let an app use its defaults
 

@@ -13,32 +13,35 @@ func executeCommand(
 ) throws -> ExitStatus {
   let catalog = try Catalog.load()
   let url = policyURL ?? Policy.defaultURL
-  let names = try catalog.selectedFeatureNames(requestedNames)
+  let state = command.desiredState
+  let names = try catalog.selectedFeatureNames(
+    requestedNames, defaultingToAll: state == nil && command != .download)
   if command == .features {
-    for (name, feature) in catalog.features.sorted(by: { $0.key < $1.key }) {
-      print("\(name): \(feature.description) [\(feature.controls.joined(separator: ", "))]")
+    for name in catalog.featureNames {
+      let feature = catalog.features[name]!
+      let controls = catalog.controls(for: feature).joined(separator: ", ")
+      print("\(name): \(feature.description) [\(controls)]")
     }
     return .success
   }
   if command == .check { return checkService(catalog: catalog) }
   var policy = try Policy.load(url, explicit: policyURL != nil, catalog: catalog)
-  if let state = command.desiredState {
+  if let state {
     guard !names.isEmpty else {
       throw CLIError("\(command.rawValue) requires feature names or 'all'")
     }
     policy.set(state, for: names)
   }
-  let selected = names.isEmpty ? catalog.featureNames : names
   switch command {
   case .status:
     let status = Dictionary(
-      uniqueKeysWithValues: selected.map { name in
+      uniqueKeysWithValues: names.lazy.map { name in
         let feature = catalog.features[name]!
         return (
           name,
           FeatureStatus(
             desired: policy.state(name), preferences: feature.preferences.map(preferenceStatus),
-            managementRequired: feature.managementRequired,
+            managementRequired: catalog.hasProfileControls(feature) || !feature.declarations.isEmpty,
             modelAvailabilityOnly: feature.modelAvailabilityOnly)
         )
       })
@@ -52,16 +55,15 @@ func executeCommand(
   case .declarations:
     FileHandle.standardOutput.write(try declarationData(policy: policy, catalog: catalog))
   case .download:
-    return try recoverModels(
-      names.isEmpty ? [] : selected, policy: policy, catalog: catalog, dryRun: dryRun)
+    return try recoverModels(names, policy: policy, catalog: catalog, dryRun: dryRun)
   case .models:
-    let targets = catalog.assetSets(for: selected)
+    let targets = catalog.assetSets(for: names)
     let statuses = try modelStatus(targets, catalog: catalog)
     FileHandle.standardOutput.write(try jsonData(statuses))
     return statuses.contains(where: \.hasErrors)
       ? .failure : .success
   case .cleanup:
-    let requested = Set(catalog.assetSets(for: selected))
+    let requested = Set(catalog.assetSets(for: names))
     var targets = policy.cleanupTargets(catalog).filter { requested.contains($0) }
     if let reviewedAssetSets {
       let selection = Set(reviewedAssetSets)
@@ -90,7 +92,7 @@ func executeCommand(
       return .success
     }
     try persistPolicyChanges(
-      policy: policy, url: url, catalog: catalog, names: selected, reset: command == .reset)
+      policy: policy, url: url, catalog: catalog, names: names, reset: command == .reset)
   case .features, .check:
     preconditionFailure("Handled before policy loading")
   }
@@ -105,26 +107,37 @@ func persistPolicyChanges(
     throw CLIError("This policy is managed by Nix; change programs.pared.features and reactivate")
   }
   let directory = url.deletingLastPathComponent()
-  let profileURL = directory.appendingPathComponent(Artifacts.profileFilename)
-  let declarationsURL = directory.appendingPathComponent(Artifacts.declarationsFilename)
-  // The two generated destinations need no heap-backed collection
-  let generatedURLs: InlineArray<2, URL> = [profileURL, declarationsURL]
+  let outputs: InlineArray<
+    2, (url: URL, encode: (Policy, Catalog) throws -> Data, label: String)
+  > = [
+    (
+      directory.appendingPathComponent(Artifacts.profileFilename),
+      profileData, "Install the updated profile for managed controls"
+    ),
+    (
+      directory.appendingPathComponent(Artifacts.declarationsFilename),
+      declarationData, "MDM declarations"
+    ),
+  ]
   let policyURL = url.standardizedFileURL.resolvingSymlinksInPath()
   guard
-    !generatedURLs.indices.contains(where: {
-      generatedURLs[$0].standardizedFileURL.resolvingSymlinksInPath() == policyURL
+    !outputs.indices.contains(where: {
+      outputs[$0].url.standardizedFileURL.resolvingSymlinksInPath() == policyURL
     })
   else {
     throw CLIError("The policy path conflicts with a generated artifact; choose another filename")
   }
   try policy.save(url)
-  try profileData(policy: policy, catalog: catalog).write(to: profileURL, options: .atomic)
-  try declarationData(policy: policy, catalog: catalog).write(
-    to: declarationsURL, options: .atomic)
+  for index in outputs.indices {
+    let output = outputs[index]
+    try output.encode(policy, catalog).write(to: output.url, options: .atomic)
+  }
   if reportArtifacts {
     report("Saved policy: \(url.path)")
-    report("Install the updated profile for managed controls: \(profileURL.path)")
-    report("MDM declarations: \(declarationsURL.path)")
+    for index in outputs.indices {
+      let output = outputs[index]
+      report("\(output.label): \(output.url.path)")
+    }
   }
   try applyPreferences(policy: policy, catalog: catalog, names: names, reset: reset)
   if reportArtifacts {

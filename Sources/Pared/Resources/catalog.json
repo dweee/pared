@@ -7,7 +7,7 @@
         "title": "Siri",
         "symbol": "waveform",
         "group": "Siri & Writing",
-        "note": "Voice Activation is a separate choice. Keeping Siri on retains its shared models. macOS may keep Siri background services running even when Siri is off."
+        "note": "Siri AI (Beta) and voice activation are separate choices. Keeping Siri on retains its shared models. macOS may keep Siri background services running even when Siri is off."
       },
       "preferences": [
         {
@@ -25,6 +25,27 @@
       ],
       "restrictions": ["allowAssistant"],
       "declarations": ["siri.Enabled"],
+      "assetSets": ["com.apple.modelcatalog"]
+    },
+    "siriAI": {
+      "description": "Choose a Siri version on macOS 27 or later",
+      "display": {
+        "title": "Siri AI (Beta)",
+        "symbol": "waveform",
+        "group": "Siri & Writing",
+        "note": "Off selects Siri Classic. On allows Siri AI where available. This choice does not turn Siri or Apple Intelligence on or off."
+      },
+      "preferences": [
+        {
+          "domain": "com.apple.assistant.backedup",
+          "key": "Enable Offline Mode For Apple Intelligence",
+          "title": "Siri AI (Beta)",
+          "inverted": true,
+          "darwinNotification": "com.apple.siri.appleIntelligenceFallback.didChange"
+        }
+      ],
+      "restrictions": [],
+      "declarations": [],
       "assetSets": ["com.apple.modelcatalog"]
     },
     "siriVoiceTrigger": {
@@ -118,7 +139,7 @@
         "subscriber": "org.pared",
         "name": "imagePlayground",
         "usageAliases": {
-          "VisualGeneration.GenerativePlayground": "language_en"
+          "com.apple.Settings.AppleIntelligence.Diffusion": "language_en"
         },
         "additionalAssetSets": ["com.apple.MobileAsset.UAF.FM.Overrides"],
         "minimumOSMajorVersion": 27
@@ -445,16 +466,10 @@
     "com.apple.spatialphotosrelive": "8FE8D8DB-D187-5A4E-B442-71D92A65DF0F",
     "group.com.apple.usernoted": "63D64C75-B64D-5D1B-8106-EC8B7849333D",
     "com.apple.MobileSMS": "29B0BAC7-8386-5EC3-932E-E325D744380C",
-    "group.com.apple.mail": "EA0E23B7-D189-5689-B2A7-ABDFFDABC039",
-    "com.apple.MobileAsset": "AF7975DA-1BCF-4CBF-ACAB-72C42F42BA49"
+    "group.com.apple.mail": "EA0E23B7-D189-5689-B2A7-ABDFFDABC039"
   },
   "recoveryAssetTypes": {
     "com.apple.MobileAsset.UAF.FM.Overrides": "com.apple.MobileAsset.UAF.FM.Overrides",
     "com.apple.MobileAsset.UAF.Shortcuts.Generator": "com.apple.MobileAsset.UAF.Shortcuts.Generator"
-  },
-  "downloadBlocking": {
-    "domain": "com.apple.MobileAsset",
-    "keyPrefix": "DownloadServerBaseURLOverride-",
-    "url": "https://127.0.0.1:9/pared-blocked/"
   }
 }
